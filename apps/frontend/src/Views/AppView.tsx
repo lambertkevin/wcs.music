@@ -41,7 +41,7 @@ const AppView = () => {
     setIsAnalyzeOngoing(true);
     const response = await axios
       .post<Record<string, LinkMetaResponse>>(
-        "http://127.0.0.1:3000/v1/video/analyze",
+        `${import.meta.env.VITE_API_DOMAIN}/v1/video/analyze`,
         {
           links: links.split("\n"),
         },
@@ -80,7 +80,7 @@ const AppView = () => {
     setIsIdentifyOngoing(true);
     const response = await axios
       .post<Record<string, LinkMetaResponse>>(
-        "http://127.0.0.1:3000/v1/video/identify",
+        `${import.meta.env.VITE_API_DOMAIN}/v1/video/identify`,
         {
           links: Array.from(selectedLinks),
           songMatchSources: ["YOUTUBE", "SHAZAM"],

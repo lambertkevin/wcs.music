@@ -51,7 +51,7 @@ const RightPanelComponent = ({
     setIsSearchTracksOngoing(true);
     axios
       .post<z.infer<(typeof SpotifySearchTracksReponseSchema)["2xx"]>>(
-        "http://127.0.0.1:3000/v1/spotify/search-tracks",
+        `${import.meta.env.VITE_API_DOMAIN}/v1/spotify/search-tracks`,
         {
           items: Array.from(selectedLinks)
             .flatMap((link) => analyzedLinksMap[link].songMatches)

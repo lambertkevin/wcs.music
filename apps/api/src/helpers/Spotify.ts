@@ -89,7 +89,7 @@ export const getUserAccessToken = async (
     return {
       type: "error",
       message: "Open this link",
-      details: `https://accounts.spotify.com/authorize?client_id=${process.env.CLIENT_ID}&response_type=code&scope=playlist-modify-private,playlist-modify-public&redirect_uri=http://127.0.0.1:3000/v1/spotify/auth`,
+      details: `https://accounts.spotify.com/authorize?client_id=${process.env.CLIENT_ID}&response_type=code&scope=playlist-modify-private,playlist-modify-public&redirect_uri=${process.env.VITE_API_DOMAIN}/v1/spotify/auth`,
     };
   }
 
@@ -172,7 +172,7 @@ export const getUserTokensFromCode = async (
         "https://accounts.spotify.com/api/token",
         {
           grant_type: "authorization_code",
-          redirect_uri: "http://127.0.0.1:5173/spotify/auth",
+          redirect_uri: `${process.env.VITE_FRONTEND_DOMAIN}/spotify/auth`,
           code: code,
         },
         {
