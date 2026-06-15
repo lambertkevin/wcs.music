@@ -53,7 +53,7 @@ const AppView = () => {
   };
 
   const [selectedLinks, setSelectedLinks] = useState<Set<string>>(new Set());
-  const onVideoChecked = (id: string, checked: boolean) => {
+  const onVideoElementListChecked = (id: string, checked: boolean) => {
     setSelectedLinks((prev) => {
       const next = new Set(prev);
       if (checked) {
@@ -65,7 +65,7 @@ const AppView = () => {
       return next;
     });
   };
-  const onSelectAllVideos = () => {
+  const onSelectAllVideoElements = () => {
     if (selectedLinks.size !== analyzedLinkMapSize) {
       setSelectedLinks(new Set(Object.keys(analyzedLinksMap)));
     } else {
@@ -73,6 +73,8 @@ const AppView = () => {
     }
   };
 
+  const [identifiedSongsMap, setIdentifiedSongsMap] =
+    useState<Record<string, LinkMetaResponse>>();
   const [isIdentifyOngoing, setIsIdentifyOngoing] = useState(false);
   const onIdentifySongs = async () => {
     if (isIdentifyOngoing) return;
@@ -89,7 +91,7 @@ const AppView = () => {
       .finally(() => {
         setIsIdentifyOngoing(false);
       });
-    setAnalyzedLinks(response.data);
+    setIdentifiedSongsMap(response.data);
   };
 
   return (
@@ -105,10 +107,11 @@ const AppView = () => {
         className="w-5/12 flex flex-col bg-base-200 relative justify-between h-full"
         analyzedLinks={analyzedLinks}
         analyzedLinksMapSize={analyzedLinkMapSize}
-        onSelectAll={onSelectAllVideos}
-        onVideoChecked={onVideoChecked}
+        onSelectAll={onSelectAllVideoElements}
+        onVideoElementChecked={onVideoElementListChecked}
         selectedLinks={selectedLinks}
         onIdentifySongs={onIdentifySongs}
+        identifiedSongsMap={identifiedSongsMap}
         buttonDisabled={isIdentifyOngoing}
       />
       <RightPanelComponent
@@ -116,6 +119,7 @@ const AppView = () => {
         selectedLinks={selectedLinks}
         analyzedLinks={analyzedLinks}
         analyzedLinksMap={analyzedLinksMap}
+        identifiedSongsMap={identifiedSongsMap}
       />
       <ModalComponent />
     </main>

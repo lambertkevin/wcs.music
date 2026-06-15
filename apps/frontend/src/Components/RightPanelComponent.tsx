@@ -12,6 +12,7 @@ type Props = {
   selectedLinks: Set<string>;
   analyzedLinks: Record<string, LinkMetaResponse> | undefined;
   analyzedLinksMap: Record<string, VideoMeta>;
+  identifiedSongsMap: Record<string, LinkMetaResponse> | undefined;
   disablePrimaryButton?: boolean;
   disableSecondaryButton?: boolean;
 };
@@ -21,14 +22,21 @@ const RightPanelComponent = ({
   selectedLinks,
   analyzedLinks,
   analyzedLinksMap,
+  identifiedSongsMap,
   disablePrimaryButton,
   disableSecondaryButton,
 }: Props) => {
   const selectedLinksHaveSongMatches = useMemo(() => {
     for (const link of selectedLinks) {
-      if (!analyzedLinksMap[link]?.songMatches?.length) return false;
+      if (
+        identifiedSongsMap &&
+        identifiedSongsMap[link].type === "VIDEO" &&
+        identifiedSongsMap[link].videoDetails.songMatches?.length
+      )
+        return true;
+      if (analyzedLinksMap[link]?.songMatches?.length) return true;
     }
-    return true;
+    return false;
   }, [selectedLinks]);
 
   const [selectedTracks, setSelectedTracks] = useState<Set<string>>(new Set());
@@ -54,7 +62,15 @@ const RightPanelComponent = ({
         `${import.meta.env.VITE_API_DOMAIN}/v1/spotify/search-tracks`,
         {
           items: Array.from(selectedLinks)
-            .flatMap((link) => analyzedLinksMap[link].songMatches)
+            .flatMap((link) => {
+              if (
+                identifiedSongsMap &&
+                identifiedSongsMap[link]?.type === "VIDEO"
+              ) {
+                return identifiedSongsMap[link].videoDetails.songMatches;
+              }
+              return analyzedLinksMap[link].songMatches;
+            })
             .filter((e) => !!e),
         },
       )
