@@ -13,7 +13,6 @@ import {
   PurpleContent as PurpleContentPlaylist,
   YoutubePlaylistInitialData,
   FluffyContent as FluffyContentPlaylist,
-  PlaylistVideoListRendererContent,
 } from "../types/youtube-playlist.types";
 import {
   HorizontalCardListRendererCard as Card,
@@ -105,7 +104,7 @@ export const getLinkMeta = async (
     }
 
     const initialData = await axios
-      .get<string>(videoURI)
+      .get<string>(`${videoURI}&hl=en`)
       .then(({ data }) => {
         const initialData = data.match(
           /var ytInitialData\s*=\s*(\{.*?\});\s*<\/script>/s,
@@ -127,13 +126,13 @@ export const getLinkMeta = async (
         uri: videoURI,
         title:
           initialData?.microformat?.microformatDataRenderer?.title || "Unknown",
-        playlistId: videoURI.replace("https://youtube.com/playlist?list=", ""),
+        playlistId: YoutubePlaylistURIRegex.exec(videoURI)?.[1] || videoURI,
         items: {
           connectOrCreate: items.map((item) => ({
             where: { uri: item.uri },
             create: {
               uri: item.uri,
-              videoId: item.uri.replace("https://youtube.com/watch?v=", ""),
+              videoId: YoutubeVideoURIRegex.exec(item.uri)?.[1] || item.uri,
               title: item.title,
               lengthSeconds: item.lengthSeconds,
               thumbnails: item.thumbnails,
@@ -183,7 +182,7 @@ export const getLinkMeta = async (
     }
 
     const { initialData, initialPlayerResponse } = await axios
-      .get<string>(videoURI)
+      .get<string>(`${videoURI}&hl=en`)
       .then(({ data }) => {
         const initialDataMatch = data.match(
           /var ytInitialData\s*=\s*(\{.*?\});\s*<\/script>/s,
@@ -221,7 +220,7 @@ export const getLinkMeta = async (
       where: { uri: videoURI },
       create: {
         uri: videoURI,
-        videoId: videoURI.replace("https://youtube.com/watch?v=", ""),
+        videoId: YoutubeVideoURIRegex.exec(videoURI)?.[1] || videoURI,
         title: videoDetails.title,
         lengthSeconds: videoDetails.lengthSeconds,
         thumbnails: videoDetails.thumbnails,
@@ -328,7 +327,6 @@ export const extractVideoInfoFromPlaylistInitialData = (
 ): VideoMeta[] => {
   if (!initialData?.contents?.twoColumnBrowseResultsRenderer?.tabs) return [];
   const { tabs } = initialData.contents.twoColumnBrowseResultsRenderer;
-
   const sectionListRendererContents: PurpleContentPlaylist[] = [];
   for (const tab of tabs) {
     if (tab?.tabRenderer?.content?.sectionListRenderer?.contents) {
@@ -347,24 +345,76 @@ export const extractVideoInfoFromPlaylistInitialData = (
   }
   if (!itemSectionRendererContents.length) return [];
 
-  const playlistVideoListRendererContents: PlaylistVideoListRendererContent[] =
-    [];
+  const playlistContent: VideoMeta[] = [];
   for (const content of itemSectionRendererContents) {
     if (content?.playlistVideoListRenderer?.contents) {
-      playlistVideoListRendererContents.push(
-        ...content.playlistVideoListRenderer.contents,
+      playlistContent.push(
+        ...content.playlistVideoListRenderer.contents.map((element) => ({
+          uri: `https://youtube.com/watch?v=${element?.playlistVideoRenderer?.videoId}`,
+          videoId: element?.playlistVideoRenderer?.videoId || "",
+          title: element?.playlistVideoRenderer?.title?.runs?.[0]?.text || "",
+          lengthSeconds: element?.playlistVideoRenderer?.lengthSeconds || "0",
+          thumbnails:
+            element?.playlistVideoRenderer?.thumbnail?.thumbnails || [],
+        })),
       );
+    } else if (content?.lockupViewModel) {
+      const { lockupViewModel } = content;
+
+      playlistContent.push({
+        uri: `https://youtube.com/watch?v=${lockupViewModel.contentId}`,
+        videoId: `https://youtube.com/watch?v=${lockupViewModel.contentId}`,
+        title:
+          lockupViewModel.metadata?.lockupMetadataViewModel?.title?.content ||
+          "",
+        lengthSeconds:
+          extractLengthInSecondsFromLockupViewModel(lockupViewModel),
+        thumbnails:
+          lockupViewModel.contentImage?.thumbnailViewModel?.image?.sources ||
+          [],
+      });
     }
   }
 
-  return playlistVideoListRendererContents.map((element) => ({
-    uri: `https://youtube.com/watch?v=${element?.playlistVideoRenderer?.videoId}`,
-    videoId: element?.playlistVideoRenderer?.videoId || "",
-    title: element?.playlistVideoRenderer?.title?.runs?.[0]?.text || "",
-    lengthSeconds: element?.playlistVideoRenderer?.lengthSeconds || "0",
-    thumbnails: element?.playlistVideoRenderer?.thumbnail?.thumbnails || [],
-  }));
+  return playlistContent;
 };
 
 export const getVideoCode = (uri: string): string =>
   escape(uri.match(YoutubeVideoURIRegex)?.[1] || "");
+
+const youtubeTimerLengthRegex = new RegExp(
+  /(?:([0-9]{1,2}):)?([0-9]{1,2}):([0-9]{2})/s,
+);
+
+const extractLengthInSecondsFromLockupViewModel = (
+  lockupViewModel: FluffyContentPlaylist["lockupViewModel"],
+): string => {
+  const { overlays } = lockupViewModel?.contentImage?.thumbnailViewModel || {};
+  if (!overlays) {
+    return "0";
+  }
+
+  const badges = overlays.flatMap(
+    (overlay) => overlay.thumbnailBottomOverlayViewModel?.badges,
+  );
+
+  for (const badge of badges) {
+    if (!badge) continue;
+
+    const { text } = badge.thumbnailBadgeViewModel || {};
+    if (!text) continue;
+
+    if (youtubeTimerLengthRegex.test(text)) {
+      const [, hours = "0", minutes = "0", seconds = "0"] =
+        youtubeTimerLengthRegex.exec(text) || [];
+
+      return (
+        parseInt(hours) * 360 +
+        parseInt(minutes) * 60 +
+        parseInt(seconds)
+      ).toString();
+    }
+  }
+
+  return "0";
+};
