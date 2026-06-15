@@ -1,28 +1,38 @@
+import { useMemo } from "react";
 import classNames from "classnames";
-import type { SongMatchSource, VideoMeta } from "../../../api/src/types";
 import YoutubeSvg from "../assets/youtube.svg?react";
 import ShazamSvg from "../assets/shazam.svg?react";
 import { secondsToDigital } from "../helpers";
-import { useMemo } from "react";
+import type {
+  LinkMetaResponse,
+  SongMatchSource,
+  VideoMeta,
+} from "../../../api/src/types";
 
 type Props = {
   className: string | undefined;
-  onVideoChecked: (uri: string, checked: boolean) => void;
+  onVideoElementChecked: (uri: string, checked: boolean) => void;
   selectedLinks: Set<string>;
   videoDetails: VideoMeta;
+  identifiedSongsMap: Record<string, LinkMetaResponse> | undefined;
   index: number;
   subIndex?: number;
 };
 
 const VideoListElementComponent = ({
   className,
-  onVideoChecked,
+  onVideoElementChecked,
   selectedLinks,
   videoDetails,
+  identifiedSongsMap,
   index,
   subIndex,
 }: Props) => {
-  const { uri, thumbnails, title, lengthSeconds, songMatches } = videoDetails;
+  const { uri, thumbnails, title, lengthSeconds } = videoDetails;
+  const { songMatches } =
+    identifiedSongsMap?.[uri]?.type === "VIDEO"
+      ? identifiedSongsMap?.[uri]?.videoDetails || {}
+      : videoDetails;
 
   const songMatchesBySource = useMemo(() => {
     const sources: Record<SongMatchSource, typeof songMatches> = {
@@ -52,7 +62,7 @@ const VideoListElementComponent = ({
         className,
         selectedLinks.has(uri) ? "bg-base-300" : "",
       ])}
-      onClick={() => onVideoChecked(uri, !selectedLinks.has(uri))}
+      onClick={() => onVideoElementChecked(uri, !selectedLinks.has(uri))}
     >
       <div
         className={classNames([

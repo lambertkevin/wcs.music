@@ -81,6 +81,7 @@ type PurpleItemSectionRenderer = {
 
 export type FluffyContent = {
   playlistVideoListRenderer?: PlaylistVideoListRenderer;
+  lockupViewModel?: LockupViewModel;
 };
 
 type PlaylistVideoListRenderer = {
@@ -94,6 +95,140 @@ type PlaylistVideoListRenderer = {
 
 export type PlaylistVideoListRendererContent = {
   playlistVideoRenderer?: PlaylistVideoRenderer;
+};
+
+type LockupViewModel = {
+  contentImage?: ContentImage;
+  metadata?: LockupViewModelMetadata;
+  contentId?: string;
+  contentType?:
+    | "LOCKUP_CONTENT_TYPE_VIDEO"
+    | "LOCKUP_CONTENT_TYPE_PLAYLIST"
+    | "LOCKUP_CONTENT_TYPE_PODCAST";
+  rendererContext?: LockupViewModelRendererContext;
+};
+
+type ContentImage = {
+  thumbnailViewModel?: ThumbnailViewModel;
+};
+
+type ThumbnailViewModel = {
+  image?: ThumbnailViewModelImage;
+  overlays?: ThumbnailViewModelOverlay[];
+};
+
+type ThumbnailViewModelOverlay = {
+  thumbnailBottomOverlayViewModel?: ThumbnailBottomOverlayViewModel;
+  thumbnailHoverOverlayToggleActionsViewModel?: ThumbnailHoverOverlayToggleActionsViewModel;
+};
+
+type ThumbnailHoverOverlayToggleActionsViewModel = {
+  buttons?: ButtonElement[];
+};
+
+type ButtonElement = {
+  toggleButtonViewModel?: ButtonToggleButtonViewModel;
+};
+
+type ButtonToggleButtonViewModel = {
+  defaultButtonViewModel?: ButtonViewModel;
+  // toggledButtonViewModel?: ToggledButtonViewModel;
+  isToggled?: boolean;
+  trackingParams?: string;
+};
+
+type ThumbnailBottomOverlayViewModel = {
+  badges?: Badge[];
+};
+
+type Badge = {
+  thumbnailBadgeViewModel?: ThumbnailBadgeViewModel;
+};
+
+type ThumbnailBadgeViewModel = {
+  text?: string;
+  badgeStyle?: "THUMBNAIL_OVERLAY_BADGE_STYLE_DEFAULT";
+  animationActivationTargetId?: string;
+  animationActivationEntityKey?: string;
+  lottieData?: LottieData;
+  animatedText?: string;
+  animationActivationEntitySelectorType?: "THUMBNAIL_BADGE_ANIMATION_ENTITY_SELECTOR_TYPE_PLAYER_STATE";
+  rendererContext?: ThumbnailBadgeViewModelRendererContext;
+  icon?: Icon;
+  inlinePlaybackBadgeData?: InlinePlaybackBadgeData;
+};
+
+type LottieData = {
+  url?: string;
+  settings?: Settings;
+};
+
+type Settings = {
+  loop?: boolean;
+  autoplay?: boolean;
+};
+
+type InlinePlaybackBadgeData = {
+  replicateAsTimestamp?: boolean;
+};
+
+type ThumbnailBadgeViewModelRendererContext = {
+  accessibilityContext?: AccessibilityContextClass;
+};
+
+type ThumbnailViewModelImage = {
+  sources?: ThumbnailElement[];
+};
+
+type LockupViewModelRendererContext = {
+  loggingContext?: PurpleLoggingContext;
+  accessibilityContext?: AccessibilityContextClass;
+  commandContext?: TentacledCommandContext;
+};
+
+type LockupViewModelMetadata = {
+  lockupMetadataViewModel?: LockupMetadataViewModel;
+};
+
+type LockupMetadataViewModel = {
+  title?: HeadlineClass;
+  image?: LockupMetadataViewModelImage;
+  metadata?: LockupMetadataViewModelMetadata;
+};
+
+type LockupMetadataViewModelImage = {
+  decoratedAvatarViewModel?: DecoratedAvatarViewModel;
+};
+
+type DecoratedAvatarViewModel = {
+  rendererContext?: DecoratedAvatarViewModelRendererContext;
+};
+
+type DecoratedAvatarViewModelRendererContext = {
+  commandContext?: PurpleCommandContext;
+};
+
+type LockupMetadataViewModelMetadata = {
+  contentMetadataViewModel?: PurpleContentMetadataViewModel;
+};
+
+type PurpleContentMetadataViewModel = {
+  metadataRows?: PurpleMetadataRow[];
+  delimiter?: " • ";
+};
+
+type PurpleMetadataRow = {
+  metadataParts?: PurpleMetadataPart[];
+};
+
+type PurpleMetadataPart = {
+  text?: MetadataPartText;
+};
+
+type MetadataPartText = {
+  content?: string;
+  commandRuns?: CommandRun[];
+  styleRuns?: PurpleStyleRun[];
 };
 
 type PlaylistVideoRenderer = {

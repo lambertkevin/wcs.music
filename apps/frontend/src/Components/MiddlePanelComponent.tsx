@@ -9,7 +9,8 @@ type Props = {
   selectedLinks: Set<string>;
   analyzedLinksMapSize: number;
   analyzedLinks: Record<string, LinkMetaResponse> | undefined;
-  onVideoChecked: (uri: string, checked: boolean) => void;
+  identifiedSongsMap: Record<string, LinkMetaResponse> | undefined;
+  onVideoElementChecked: (uri: string, checked: boolean) => void;
   buttonDisabled: boolean;
   onIdentifySongs: () => void;
 };
@@ -19,8 +20,9 @@ const MiddlePanelComponent = ({
   selectedLinks,
   analyzedLinksMapSize,
   analyzedLinks,
+  identifiedSongsMap,
   onSelectAll,
-  onVideoChecked,
+  onVideoElementChecked,
   buttonDisabled,
   onIdentifySongs,
 }: Props) => {
@@ -86,10 +88,11 @@ const MiddlePanelComponent = ({
                 <VideoListElementComponent
                   key={linkMeta.videoDetails.uri}
                   className="list-row flex items-center cursor-pointer bg-base-300 transition-colors duration-300 ml-0 rounded-none"
-                  onVideoChecked={onVideoChecked}
-                  videoDetails={linkMeta.videoDetails}
                   index={index}
+                  onVideoElementChecked={onVideoElementChecked}
+                  videoDetails={linkMeta.videoDetails}
                   selectedLinks={selectedLinks}
+                  identifiedSongsMap={identifiedSongsMap}
                 />
               ) : linkMeta.type === "PLAYLIST" ? (
                 <li>
@@ -110,13 +113,14 @@ const MiddlePanelComponent = ({
                   <ul className="pl-4 border-l border-neutral/40">
                     {linkMeta.items.map((videoDetails, subIndex) => (
                       <VideoListElementComponent
-                        className="list-row flex items-center cursor-pointer bg-base-300 transition-colors duration-300 ml-0 rounded-none"
                         key={videoDetails.uri}
-                        onVideoChecked={onVideoChecked}
-                        videoDetails={videoDetails}
+                        className="list-row flex items-center cursor-pointer bg-base-300 transition-colors duration-300 ml-0 rounded-none"
                         index={index}
                         subIndex={subIndex}
+                        onVideoElementChecked={onVideoElementChecked}
+                        videoDetails={videoDetails}
                         selectedLinks={selectedLinks}
+                        identifiedSongsMap={identifiedSongsMap}
                       />
                     ))}
                   </ul>

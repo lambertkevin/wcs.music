@@ -1,14 +1,14 @@
 import { z } from "zod/v4";
 
 export const YoutubeVideoURIRegex =
-  /(?:https:\/\/)?(?:www\.)?youtu\.?be(?:\.com)?\/(?:watch\?v=)?([a-zA-Z0-9_-]{11})/;
+  /(?:https:\/\/)?(?:www\.)?youtu\.?be(?:\.com)?\/(?:watch\?v=)?([a-zA-Z0-9_-]{11})/s;
 
 /**
  * Youtube playlist ID length can vary, following link is explaining the possibilities
  * @see https://ytp-length.vercel.app/blogs/decoding-youtube-playlist-ids/
  */
 export const YoutubePlaylistURIRegex =
-  /^(?:https:\/\/)?(?:www\.)?youtube\.com\/playlist\?list=([a-zA-Z0-9_-]{18,34})/;
+  /^(?:https:\/\/)?(?:www\.)?youtube\.com\/playlist\?list=([a-zA-Z0-9_-]{18,34})/s;
 
 const YouTubeVideoURISchema = z.string().regex(YoutubeVideoURIRegex);
 
