@@ -1,0 +1,6 @@
+.DS_Store
+apps/db/**/*
+!**/.gitkeep
+.env
+**/*.rdb
+**/.vscode

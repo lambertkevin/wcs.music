@@ -1,0 +1,64 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SongMatchSource {
+  SHAZAM
+  YOUTUBE
+}
+
+model SongMatch {
+  id String @id @default(uuid())
+  title String
+  artist String
+  source SongMatchSource
+  chunkStart Int?
+  chunkEnd Int?
+  date DateTime @default(now())
+
+  videoMeta VideoMeta @relation(fields: [videoMetaId], references: [id])
+  videoMetaId String
+}
+
+model VideoMeta {
+  id  String @id @default(uuid())
+  uri String @unique
+  videoId String
+  title String
+  lengthSeconds String
+  thumbnails Json
+  date DateTime @default(now())
+
+  songMatches SongMatch[]
+  playlists PlaylistMeta[]
+}
+
+model PlaylistMeta {
+  id String @id @default(uuid())
+  uri String @unique
+  playlistId String
+  title String
+  date DateTime @default(now())
+  
+  items VideoMeta[]
+}
+
+model SpotifyResult {
+  id String @id @default(uuid())
+  searchTerm String
+  artist String
+  title String
+  uri String
+  date DateTime @default(now())
+}

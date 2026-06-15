@@ -1,0 +1,13 @@
+{
+  "extends": "fastify-tsconfig",
+  "compilerOptions": {
+    "outDir": "dist",
+    "sourceMap": true,
+    "paths": {
+      "node-shazam": ["./node_modules/node-shazam/dist/esm/index.d.ts"]
+    },
+    "types": ["node"],
+    "esModuleInterop": true,
+  },
+  "include": ["**/*.ts"],
+}
