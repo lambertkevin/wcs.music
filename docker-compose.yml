@@ -1,7 +1,7 @@
 version: '2.4'
 
 services:
-  db:
+  wcs-db:
     image: postgres:18
     healthcheck:
       test: ["CMD-SHELL", "pg_isready"]
@@ -15,3 +15,31 @@ services:
       - ./apps/db:/var/lib/postgresql
     ports:
       - 5432:5432
+  wcs-node:
+    image: "node:26.4.0-trixie-slim"
+    user: "root"
+    volumes:
+      - ./apps/api:/app
+    working_dir: /app
+    restart: always
+    env_file:
+      - .env
+    command: ./run.sh
+    ports:
+      - ${API_PORT}:${API_PORT}
+
+  wcs-frontend:
+    image: "node:26.4.0-trixie-slim"
+    user: "root"
+    volumes:
+      - ./apps/frontend:/app
+    working_dir: /app
+    env_file:
+      - .env
+    environment:
+      - VITE_CLIENT_ID=${CLIENT_ID}
+      - VITE_API_DOMAIN=${API_DOMAIN}
+      - VITE_FRONTEND_DOMAIN=${FRONTEND_DOMAIN}
+    command: ./run.sh
+    ports:
+      - ${FRONTEND_PORT}:${FRONTEND_PORT}

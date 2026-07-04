@@ -14,8 +14,9 @@ export default ({ mode }: { mode: string }) => {
 
   return defineConfig({
     server: {
-      host: "127.0.0.1",
-      port: 5173,
+      host: true,
+      strictPort: true,
+      port: parseInt(process.env.FRONTEND_PORT || "5173"),
     },
     plugins: [
       react(),
