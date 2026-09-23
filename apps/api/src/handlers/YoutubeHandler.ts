@@ -1,12 +1,18 @@
-import asyncPool from "tiny-async-pool";
 import { FastifyInstance } from "fastify";
-import { downloadSong, getLinkMeta } from "../helpers/Youtube";
-import { deleteFiles, getChunks } from "../helpers/Utilities";
-import { PrismaClient } from "../../generated/prisma/client";
+import { getOrDownloadSong, getLinkMeta } from "../helpers/Youtube";
+import { getSongInfosFromShazamResult, shazamSong } from "../helpers/Shazam";
 import {
-  getSongInfosFromShazamResult,
-  cachedShazamSong,
-} from "../helpers/Shazam";
+  deleteChunksOf,
+  deleteFiles,
+  getBpm,
+  getChunks,
+  parseChunkRange,
+} from "../helpers/Utilities";
+import {
+  PrismaClient,
+  SongMatch as SongMatchRecord,
+  VideoMeta as VideoMetaRecord,
+} from "../../generated/prisma/client";
 import {
   ErrorMetaResponse,
   LinkMetaResponse,
@@ -119,6 +125,105 @@ export const identifyLink = async (
   };
 };
 
+// Shazaming is network bound while BPM detection is CPU bound, so a couple of
+// chunks in flight is enough to keep both busy without thrashing either.
+const CHUNK_CONCURRENCY = 2;
+
+type VideoMetaWithMatches = VideoMetaRecord & {
+  songMatches: SongMatchRecord[];
+};
+
+/**
+ * Recognizes a chunk and detects its BPM at the same time, reusing whatever is
+ * already stored for that chunk, then persists both in a single row.
+ */
+const analyzeChunk =
+  (
+    prisma: PrismaClient,
+    videoMeta: VideoMetaWithMatches | null,
+    sourceFilePath: string,
+  ) =>
+  async (chunkPath: string): Promise<SongMatch | undefined> => {
+    const { chunkStart, chunkEnd } = parseChunkRange(chunkPath);
+    const cachedShazamMatch = videoMeta?.songMatches.find(
+      (match) =>
+        match.source === "SHAZAM" &&
+        match.chunkStart === chunkStart &&
+        match.chunkEnd === chunkEnd,
+    );
+
+    try {
+      if (cachedShazamMatch && cachedShazamMatch.bpm !== null) {
+        return {
+          source: "SHAZAM",
+          title: cachedShazamMatch.title,
+          artist: cachedShazamMatch.artist,
+          bpm: cachedShazamMatch.bpm,
+        };
+      }
+
+      // Neither of those is allowed to reject: a failed BPM detection still
+      // gives a song match, and the chunk is only deleted once both are done.
+      const [songInfos, bpm] = await Promise.all([
+        cachedShazamMatch
+          ? Promise.resolve<SongMatch>({
+              source: "SHAZAM",
+              title: cachedShazamMatch.title,
+              artist: cachedShazamMatch.artist,
+            })
+          : shazamSong(chunkPath)
+              .then(getSongInfosFromShazamResult)
+              .catch((error) => {
+                console.error(`Shazam failed for ${chunkPath}`, error);
+                return undefined;
+              }),
+        getBpm(chunkPath)
+          .then(Math.round)
+          .catch((error) => {
+            console.error(error);
+            return undefined;
+          }),
+      ]);
+
+      if (!songInfos) {
+        console.log("No match found");
+        return;
+      }
+      console.log(
+        `Found: ${songInfos.title} - ${songInfos.artist}${bpm ? ` (${bpm} BPM)` : ""}`,
+      );
+
+      if (videoMeta) {
+        await (cachedShazamMatch
+          ? prisma.songMatch.update({
+              where: { id: cachedShazamMatch.id },
+              data: { bpm },
+            })
+          : prisma.songMatch.create({
+              data: {
+                source: "SHAZAM",
+                title: songInfos.title,
+                artist: songInfos.artist,
+                chunkStart,
+                chunkEnd,
+                bpm,
+                videoMetaId: videoMeta.id,
+              },
+            }));
+      }
+
+      return { ...songInfos, bpm };
+    } catch (error) {
+      console.error(`Failed to analyze ${chunkPath}`, error);
+      return;
+    } finally {
+      // Short videos are analyzed as a whole, their only chunk is the song itself
+      if (chunkPath !== sourceFilePath) {
+        deleteFiles([chunkPath]);
+      }
+    }
+  };
+
 export const getShazamSongMatches = async (
   prisma: PrismaClient,
   videoDetails: VideoMetaResponse["videoDetails"],
@@ -129,43 +234,45 @@ export const getShazamSongMatches = async (
       songMatches: true,
     },
   });
+  const cachedMatches =
+    videoMeta?.songMatches?.filter((m) => m.source === "SHAZAM") || [];
+  // Matches stored before BPM detection existed need the song again to get one
   const shouldSkipDownload =
-    (videoMeta?.songMatches?.filter((m) => m.source === "SHAZAM")?.length ||
-      0) > 0;
+    cachedMatches.length > 0 && cachedMatches.every(({ bpm }) => bpm !== null);
 
   if (shouldSkipDownload) {
-    return (
-      videoMeta?.songMatches?.map((match) => ({
-        source: match.source,
-        title: match.title,
-        artist: match.artist,
-      })) || []
-    );
+    return cachedMatches.map((match) => ({
+      source: match.source,
+      title: match.title,
+      artist: match.artist,
+      bpm: match.bpm ?? undefined,
+    }));
   }
 
-  const filePath = await downloadSong(videoDetails.uri);
+  const filePath = await getOrDownloadSong(videoDetails.uri);
   if (!filePath) {
     throw new Error("Couldn't download the song");
   }
-  const chunks = getChunks(filePath, Number(videoDetails.lengthSeconds));
 
-  const shazamMatches: SongMatch[] = [];
-  for await (const shazamResult of asyncPool(
-    2,
-    Array.from(chunks),
-    cachedShazamSong(videoDetails.uri, prisma),
-  )) {
-    const songInfos = getSongInfosFromShazamResult(shazamResult);
-    if (songInfos) {
-      console.log(`Found: ${songInfos.title} - ${songInfos.artist}`);
-      shazamMatches.push(songInfos);
-    } else {
-      console.log("No match found");
-    }
+  try {
+    // Chunks are analyzed as soon as ffmpeg spits them out, so the recognition
+    // of the first ones overlaps with the cutting of the last ones. The stream
+    // operators are untyped, their elements are the analyzeChunk results.
+    const shazamMatches = (await getChunks(
+      filePath,
+      Number(videoDetails.lengthSeconds),
+    )
+      .map(analyzeChunk(prisma, videoMeta, filePath), {
+        concurrency: CHUNK_CONCURRENCY,
+      })
+      .filter((match?: SongMatch) => match !== undefined)
+      .toArray()) as SongMatch[];
+
+    return shazamMatches;
+  } finally {
+    deleteChunksOf(filePath);
+    deleteFiles([filePath]);
   }
-  deleteFiles([...chunks, filePath]);
-
-  return shazamMatches;
 };
 
 export default {
