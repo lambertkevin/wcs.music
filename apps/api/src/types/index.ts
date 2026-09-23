@@ -22,6 +22,7 @@ export type SongMatch = {
   source: SongMatchSource;
   title: string;
   artist: string;
+  bpm?: number | undefined;
 };
 
 export type SearchError = {

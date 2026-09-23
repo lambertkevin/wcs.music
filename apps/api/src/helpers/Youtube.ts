@@ -97,6 +97,7 @@ export const getLinkMeta = async (
                 source: match.source,
                 artist: match.artist,
                 title: match.title,
+                bpm: match.bpm ?? undefined,
               })),
             }),
           ) || [],
@@ -175,6 +176,7 @@ export const getLinkMeta = async (
                 source: match.source,
                 title: match.title,
                 artist: match.artist,
+                bpm: match.bpm ?? undefined,
               }))
             : undefined,
         },
