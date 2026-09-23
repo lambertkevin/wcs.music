@@ -1,35 +1,114 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { Readable } from "node:stream";
+import { execFile } from "node:child_process";
 
+export const getBpm = (chunkPath: string): Promise<number> =>
+  new Promise((resolve, reject) => {
+    execFile(
+      "python",
+      ["-m", "deeprhythm.infer", chunkPath, "-q"],
+      (error, stdout) => {
+        if (error) {
+          reject(
+            new Error(`BPM detection failed for ${chunkPath}`, {
+              cause: error,
+            }),
+          );
+          return;
+        }
+
+        const bpm = Number(stdout.trim());
+        if (Number.isNaN(bpm)) {
+          reject(new Error(`Unexpected deeprhythm output: ${stdout}`));
+          return;
+        }
+
+        resolve(bpm);
+      },
+    );
+  });
+
+// Cutting chunks is IO/CPU bound, a couple of ffmpeg at a time is enough to
+// keep the consumer fed without starving the analysis running alongside it.
+const FFMPEG_CONCURRENCY = 2;
+
+const chunkRangeRegex = new RegExp(/(\d*)-(\d*)$/);
+
+/**
+ * Streams the chunk paths, each one pushed as soon as ffmpeg is done with it so
+ * the consumer can start working on it while the next ones are still being cut.
+ */
 export const getChunks = (
   filePath: string,
   totalDurationSeconds: number,
   dryRun = false,
+  // Skip the first 10 seconds of the song to avoid the potential intro
   startSeconds = 10,
-  maxChunkDurationSeconds = 120,
-): Set<string> => {
+  // Chunks should be around 1m30 to match a song duration during a competition
+  maxChunkDurationSeconds = 90,
+): Readable => {
   if (totalDurationSeconds <= maxChunkDurationSeconds)
-    return new Set([filePath]);
+    return Readable.from([filePath]);
 
-  const chunksPaths = new Set<string>();
+  const starts: number[] = [];
   for (
     let start = startSeconds;
     start <= totalDurationSeconds;
     start += maxChunkDurationSeconds
   ) {
-    const chunkName = `${path.parse(filePath).name}-${start}-${Math.min(start + maxChunkDurationSeconds, totalDurationSeconds)}.mp3`;
-    const chunkPath = path.resolve(`./tmp/${chunkName}`);
-    if (!dryRun) {
-      execSync(
-        `ffmpeg -hide_banner -loglevel error -y -ss ${start} -t ${maxChunkDurationSeconds} -i "${filePath}" ` +
-          `-vn -ar 44100 -ac 1 -b:a 128k "${chunkPath}"`,
-      );
-    }
-    chunksPaths.add(chunkPath);
+    starts.push(start);
   }
 
-  return chunksPaths;
+  const cutChunk = async (start: number): Promise<string> => {
+    const end = Math.min(start + maxChunkDurationSeconds, totalDurationSeconds);
+    const chunkPath = getChunkPath(filePath, start, end);
+    if (dryRun) return chunkPath;
+
+    await new Promise<void>((resolve, reject) => {
+      execFile(
+        "ffmpeg",
+        [
+          ...["-hide_banner", "-loglevel", "error", "-y"],
+          ...["-ss", String(start), "-t", String(maxChunkDurationSeconds)],
+          ...["-i", filePath],
+          ...["-vn", "-ar", "44100", "-ac", "1", "-b:a", "128k", chunkPath],
+        ],
+        (error) =>
+          error
+            ? reject(
+                new Error(`Failed to cut the chunk ${chunkPath}`, {
+                  cause: error,
+                }),
+              )
+            : resolve(),
+      );
+    });
+
+    return chunkPath;
+  };
+
+  return Readable.from(starts).map(cutChunk, {
+    concurrency: FFMPEG_CONCURRENCY,
+  });
+};
+
+export const getChunkPath = (
+  filePath: string,
+  startSeconds: number,
+  endSeconds: number,
+): string =>
+  path.resolve(
+    `./tmp/${path.parse(filePath).name}-${startSeconds}-${endSeconds}.mp3`,
+  );
+
+export const parseChunkRange = (
+  chunkPath: string,
+): { chunkStart: number; chunkEnd: number } => {
+  const [, chunkStart = "0", chunkEnd = "0"] =
+    path.parse(chunkPath).name.match(chunkRangeRegex) || [];
+
+  return { chunkStart: Number(chunkStart), chunkEnd: Number(chunkEnd) };
 };
 
 export const deleteFiles = (chunksPaths: string[] | Set<string>): void => {
@@ -37,9 +116,29 @@ export const deleteFiles = (chunksPaths: string[] | Set<string>): void => {
     try {
       console.log(`Deleting ${path}`);
       fs.rmSync(path);
-    } catch (e) {
+    } catch {
       console.log(`Failed deleted ${path}`);
     }
+  }
+};
+
+/**
+ * Chunks are deleted as soon as they are consumed, this sweeps the ones left
+ * behind when the pipeline is interrupted halfway through.
+ */
+export const deleteChunksOf = (filePath: string): void => {
+  const tmpPath = path.resolve("./tmp");
+  const chunkPrefix = `${path.parse(filePath).name}-`;
+
+  try {
+    deleteFiles(
+      fs
+        .readdirSync(tmpPath)
+        .filter((name) => name.startsWith(chunkPrefix))
+        .map((name) => path.join(tmpPath, name)),
+    );
+  } catch {
+    console.log(`Failed to list the chunks of ${filePath}`);
   }
 };
 

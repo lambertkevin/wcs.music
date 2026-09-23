@@ -112,7 +112,15 @@ const VideoListElementComponent = ({
                 </div>
                 <ul className="pl-4 list-disc">
                   {songMatchesBySource["SHAZAM"].map((match) => (
-                    <li className="text-info opacity-50 text-xs mb-0.5">{`${match.title} - ${match.artist}`}</li>
+                    <li className="text-info opacity-50 text-xs mb-0.5">
+                      {`${match.title} - ${match.artist}`}
+                      {match.bpm !== undefined && (
+                        <>
+                          {" -"}
+                          <div className="font-medium badge badge-xs badge-soft ml-2">{`${match.bpm} BPM`}</div>
+                        </>
+                      )}
+                    </li>
                   ))}
                 </ul>
               </div>

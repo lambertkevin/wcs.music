@@ -25,7 +25,8 @@ model SongMatch {
   source SongMatchSource
   chunkStart Int?
   chunkEnd Int?
-  date DateTime @default(now())
+  bpm Int?
+  creationDate DateTime @default(now())
 
   videoMeta VideoMeta @relation(fields: [videoMetaId], references: [id])
   videoMetaId String
@@ -38,7 +39,7 @@ model VideoMeta {
   title String
   lengthSeconds String
   thumbnails Json
-  date DateTime @default(now())
+  creationDate DateTime @default(now())
 
   songMatches SongMatch[]
   playlists PlaylistMeta[]
@@ -49,7 +50,7 @@ model PlaylistMeta {
   uri String @unique
   playlistId String
   title String
-  date DateTime @default(now())
+  creationDate DateTime @default(now())
   
   items VideoMeta[]
 }
@@ -60,5 +61,5 @@ model SpotifyResult {
   artist String
   title String
   uri String
-  date DateTime @default(now())
+  creationDate DateTime @default(now())
 }

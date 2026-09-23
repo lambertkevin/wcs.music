@@ -9,7 +9,8 @@ CREATE TABLE "SongMatch" (
     "source" "SongMatchSource" NOT NULL,
     "chunkStart" INTEGER,
     "chunkEnd" INTEGER,
-    "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "bpm" INTEGER,
+    "creationDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "videoMetaId" TEXT NOT NULL,
 
     CONSTRAINT "SongMatch_pkey" PRIMARY KEY ("id")
@@ -23,7 +24,7 @@ CREATE TABLE "VideoMeta" (
     "title" TEXT NOT NULL,
     "lengthSeconds" TEXT NOT NULL,
     "thumbnails" JSONB NOT NULL,
-    "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "creationDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "VideoMeta_pkey" PRIMARY KEY ("id")
 );
@@ -34,6 +35,7 @@ CREATE TABLE "PlaylistMeta" (
     "uri" TEXT NOT NULL,
     "playlistId" TEXT NOT NULL,
     "title" TEXT NOT NULL,
+    "creationDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "PlaylistMeta_pkey" PRIMARY KEY ("id")
 );
@@ -45,7 +47,7 @@ CREATE TABLE "SpotifyResult" (
     "artist" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "uri" TEXT NOT NULL,
-    "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "creationDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "SpotifyResult_pkey" PRIMARY KEY ("id")
 );

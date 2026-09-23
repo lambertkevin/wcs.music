@@ -8,7 +8,7 @@ import ModalComponent from "../Components/ModalComponent";
 
 const AppView = () => {
   const [links, setLinks] = useState(
-    "https://www.youtube.com/playlist?list=PLcSsTORVFETMHG88_Yl8MbmMja9G85uRW",
+    window.localStorage.getItem("last-search") || "",
   );
 
   const [analyzedLinks, setAnalyzedLinks] =
@@ -44,6 +44,7 @@ const AppView = () => {
         `${import.meta.env.VITE_API_DOMAIN}/v1/video/analyze`,
         {
           links: links.split("\n"),
+          skipDurationLimit: true,
         },
       )
       .finally(() => {
@@ -86,6 +87,7 @@ const AppView = () => {
         {
           links: Array.from(selectedLinks),
           songMatchSources: ["YOUTUBE", "SHAZAM"],
+          skipDurationLimit: true,
         },
       )
       .finally(() => {
@@ -99,7 +101,10 @@ const AppView = () => {
       <LeftPanelComponent
         className="w-3/12 flex flex-col items-center relative bg-primary-content h-full"
         links={links}
-        onLinksChange={(e) => setLinks(e.target.value)}
+        onLinksChange={(e) => {
+          window.localStorage.setItem("last-search", e.target.value);
+          setLinks(e.target.value);
+        }}
         onButtonClick={onAnalyze}
         disableButton={isAnalyzeOngoing}
       />

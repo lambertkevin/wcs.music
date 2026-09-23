@@ -20,25 +20,64 @@ import {
   YoutubeInitialData,
   YoutubePlayerInitialResponse,
 } from "../types/youtube-video.types";
+import { wait } from "./Utilities";
 
 export const downloadSong = async (
   videoURI: string,
+  retries = 2,
 ): Promise<string | undefined> => {
-  const yt = new YtDlp();
+  try {
+    const yt = new YtDlp({
+      binaryPath: "/usr/local/bin/yt-dlp",
+    });
 
-  const videoCode = getVideoCode(videoURI);
-  console.log(`Start Downloading: ${videoCode}`);
-  const { filePaths } = await yt.downloadAsync(videoURI, {
-    output: path.join(path.resolve("./tmp"), `${videoCode}.%(ext)s`),
-    format: { filter: "audioonly", type: "mp3", quality: 5 },
-  });
-  console.log("filePaths", filePaths);
-  console.log(`Finished Downloading: ${videoCode}`);
+    const videoCode = getVideoCode(videoURI);
+    console.log(`Start Downloading: ${videoCode}`);
+    const { filePaths } = await yt.downloadAsync(videoURI, {
+      output: path.join(path.resolve("./tmp"), `${videoCode}.%(ext)s`),
+      format: { filter: "audioonly", type: "mp3", quality: 5 },
+      // YouTube now forces SABR streaming (no direct URL) on the web/android
+      // clients yt-dlp picks by default, which 403s downstream. mweb is the
+      // client that still returns a direct, PO-token-authenticated URL.
+      extractorArgs: { youtube: ["player_client=mweb"] },
+    });
+    console.log("filePaths", filePaths);
+    console.log(`Finished Downloading: ${videoCode}`);
 
-  if (fs.existsSync(filePaths[0])) {
-    return filePaths[0];
+    if (fs.existsSync(filePaths[0])) {
+      return filePaths[0];
+    }
+    return;
+  } catch (e) {
+    console.error(
+      `Download failed for ${videoURI} (${retries} retries left)`,
+      e,
+    );
+    if (retries > 0) {
+      await wait(500);
+      return downloadSong(videoURI, retries - 1);
+    }
   }
-  return;
+};
+
+// downloadSong writes to a path keyed only by video ID, so two concurrent
+// downloads of the same video (a double click, two tabs, the same video
+// showing up in two playlists) would race to write the same tmp file.
+const activeDownloads = new Map<string, Promise<string | undefined>>();
+
+export const getOrDownloadSong = (
+  videoURI: string,
+): Promise<string | undefined> => {
+  const videoCode = getVideoCode(videoURI);
+  const inFlightDownload = activeDownloads.get(videoCode);
+  if (inFlightDownload) return inFlightDownload;
+
+  const download = downloadSong(videoURI).finally(() => {
+    activeDownloads.delete(videoCode);
+  });
+  activeDownloads.set(videoCode, download);
+
+  return download;
 };
 
 export const getYoutubeLinkType = (videoURI: string): "VIDEO" | "PLAYLIST" => {
@@ -97,6 +136,7 @@ export const getLinkMeta = async (
                 source: match.source,
                 artist: match.artist,
                 title: match.title,
+                bpm: match.bpm ?? undefined,
               })),
             }),
           ) || [],
@@ -175,6 +215,7 @@ export const getLinkMeta = async (
                 source: match.source,
                 title: match.title,
                 artist: match.artist,
+                bpm: match.bpm ?? undefined,
               }))
             : undefined,
         },
