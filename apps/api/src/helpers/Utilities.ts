@@ -3,6 +3,32 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { execFile } from "node:child_process";
 
+export const getBpm = (chunkPath: string): Promise<number> =>
+  new Promise((resolve, reject) => {
+    execFile(
+      "python",
+      ["-m", "deeprhythm.infer", chunkPath, "-q"],
+      (error, stdout) => {
+        if (error) {
+          reject(
+            new Error(`BPM detection failed for ${chunkPath}`, {
+              cause: error,
+            }),
+          );
+          return;
+        }
+
+        const bpm = Number(stdout.trim());
+        if (Number.isNaN(bpm)) {
+          reject(new Error(`Unexpected deeprhythm output: ${stdout}`));
+          return;
+        }
+
+        resolve(bpm);
+      },
+    );
+  });
+
 // Cutting chunks is IO/CPU bound, a couple of ffmpeg at a time is enough to
 // keep the consumer fed without starving the analysis running alongside it.
 const FFMPEG_CONCURRENCY = 2;
