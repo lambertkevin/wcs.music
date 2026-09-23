@@ -64,8 +64,13 @@ test/types/index.js
 # compiled app
 dist
 
-/src/generated/prisma
-
+# prisma
 /generated/prisma
 
+/lib*
+/bin
+/include
+
 .tokens.json
+
+/tmp
